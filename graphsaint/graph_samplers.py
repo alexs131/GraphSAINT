@@ -38,6 +38,7 @@ class GraphSampler:
     example sampler in pure python is provided as `NodeSamplingVanillaPython` at the
     bottom of this file.
     """
+
     def __init__(self, adj_train, node_train, size_subgraph, args_preproc):
         """
         Inputs:
@@ -93,7 +94,7 @@ class GraphSampler:
         subg_nodes = node_ids
         for nid in node_ids:
             idx_s, idx_e = self.adj_train.indptr[nid], self.adj_train.indptr[nid + 1]
-            neighs = self.adj_train.indices[idx_s : idx_e]
+            neighs = self.adj_train.indices[idx_s: idx_e]
             for i_n, n in enumerate(neighs):
                 if n in orig2subg:
                     indices.append(orig2subg[n])
@@ -120,6 +121,7 @@ class rw_sampling(GraphSampler):
             at random;
      3. Generate node-induced subgraph from the nodes touched by the random walk.
     """
+
     def __init__(self, adj_train, node_train, size_subgraph, size_root, size_depth):
         """
         Inputs:
@@ -151,7 +153,7 @@ class rw_sampling(GraphSampler):
 
 
 class edge_sampling(GraphSampler):
-    def __init__(self,adj_train,node_train,num_edges_subgraph):
+    def __init__(self, adj_train, node_train, num_edges_subgraph):
         """
         The sampler picks edges from the training graph independently, following
         a pre-computed edge probability distribution. i.e.,
@@ -165,7 +167,8 @@ class edge_sampling(GraphSampler):
         # size. So it's probably just fine to use this number.
         self.size_subgraph = num_edges_subgraph * 2
         self.deg_train = np.array(adj_train.sum(1)).flatten()
-        self.adj_train_norm = scipy.sparse.dia_matrix((1 / self.deg_train, 0), shape=adj_train.shape).dot(adj_train)
+        self.adj_train_norm = scipy.sparse.dia_matrix(
+            (1 / self.deg_train, 0), shape=adj_train.shape).dot(adj_train)
         super().__init__(adj_train, node_train, self.size_subgraph, {})
         self.cy_sampler = cy.Edge2(
             self.adj_train.indptr,
@@ -179,7 +182,7 @@ class edge_sampling(GraphSampler):
             self.num_edges_subgraph,
         )
 
-    def preproc(self,**kwargs):
+    def preproc(self, **kwargs):
         """
         Compute the edge probability distribution p_{u,v}.
         """
@@ -193,11 +196,13 @@ class edge_sampling(GraphSampler):
         )
         self.edge_prob.data[:] = self.adj_train_norm.data[:]
         _adj_trans = scipy.sparse.csr_matrix.tocsc(self.adj_train_norm)
-        self.edge_prob.data += _adj_trans.data      # P_e \propto a_{u,v} + a_{v,u}
+        # P_e \propto a_{u,v} + a_{v,u}
+        self.edge_prob.data += _adj_trans.data
         self.edge_prob.data *= 2 * self.num_edges_subgraph / self.edge_prob.data.sum()
         # now edge_prob is a symmetric matrix, we only keep the
         # upper triangle part, since adj is assumed to be undirected.
-        self.edge_prob_tri = scipy.sparse.triu(self.edge_prob).astype(np.float32)  # NOTE: in coo format
+        self.edge_prob_tri = scipy.sparse.triu(
+            self.edge_prob).astype(np.float32)  # NOTE: in coo format
 
 
 class mrw_sampling(GraphSampler):
@@ -207,6 +212,7 @@ class mrw_sampling(GraphSampler):
 
     Fast implementation of the sampler is proposed in https://arxiv.org/abs/1810.11899
     """
+
     def __init__(self, adj_train, node_train, size_subgraph, size_frontier, max_deg=10000):
         """
         Inputs:
@@ -242,11 +248,11 @@ class mrw_sampling(GraphSampler):
             self.size_subgraph
         )
 
-    def preproc(self,**kwargs):
+    def preproc(self, **kwargs):
         _adj_hop = self.adj_train
         self.p_dist = np.array(
             [
-                _adj_hop.data[_adj_hop.indptr[v] : _adj_hop.indptr[v + 1]].sum()
+                _adj_hop.data[_adj_hop.indptr[v]: _adj_hop.indptr[v + 1]].sum()
                 for v in range(_adj_hop.shape[0])
             ],
             dtype=np.int32,
@@ -260,6 +266,7 @@ class node_sampling(GraphSampler):
     Sec 3.4 of the GraphSAINT paper. For detailed derivation, see FastGCN
     (https://arxiv.org/abs/1801.10247).
     """
+
     def __init__(self, adj_train, node_train, size_subgraph):
         """
         Inputs:
@@ -289,7 +296,7 @@ class node_sampling(GraphSampler):
         _p_dist = np.array(
             [
                 self.adj_train.data[
-                    self.adj_train.indptr[v] : self.adj_train.indptr[v + 1]
+                    self.adj_train.indptr[v]: self.adj_train.indptr[v + 1]
                 ].sum()
                 for v in self.node_train
             ],
@@ -311,6 +318,7 @@ class full_batch_sampling(GraphSampler):
 
     Therefore, the size_subgraph argument is not used here.
     """
+
     def __init__(self, adj_train, node_train, size_subgraph):
         super().__init__(adj_train, node_train, size_subgraph, {})
         self.cy_sampler = cy.FullBatch(
@@ -333,6 +341,7 @@ class NodeSamplingVanillaPython(GraphSampler):
     The simplest and most basic sampler: just pick nodes uniformly at random and return the
     node-induced subgraph.
     """
+
     def __init__(self, adj_train, node_train, size_subgraph):
         super().__init__(adj_train, node_train, size_subgraph, {})
 
