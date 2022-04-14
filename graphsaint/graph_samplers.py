@@ -353,5 +353,22 @@ class NodeSamplingVanillaPython(GraphSampler):
             ret[i] = [ret[i]]
         return ret
 
-    def preproc(self):
-        pass
+    def preproc(self, **kwargs):
+        """
+        Node probability distribution is derived in https://arxiv.org/abs/1801.10247
+        """
+        _p_dist = np.array(
+            [
+                self.adj_train.data[
+                    self.adj_train.indptr[v]: self.adj_train.indptr[v + 1]
+                ].sum()
+                for v in self.node_train
+            ],
+            dtype=np.int64,
+        )
+        self.p_dist = _p_dist.cumsum()
+        if self.p_dist[-1] > 2**31 - 1:
+            print('warning: total deg exceeds 2**31')
+            self.p_dist = self.p_dist.astype(np.float64)
+            self.p_dist /= self.p_dist[-1] / (2**31 - 1)
+        self.p_dist = self.p_dist.astype(np.int32)
