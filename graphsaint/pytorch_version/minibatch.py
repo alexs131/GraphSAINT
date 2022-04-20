@@ -199,10 +199,11 @@ class Minibatch:
         print()
         num_subg = len(self.subgraphs_remaining_nodes)
         for i in range(num_subg):
-            self.norm_aggr_train[self.subgraphs_remaining_edge_index[i]] += 1
+            # self.norm_aggr_train[self.subgraphs_remaining_edge_index[i]] += 1
             self.norm_loss_train[self.subgraphs_remaining_nodes[i]] += 1
         assert self.norm_loss_train[self.node_val].sum(
         ) + self.norm_loss_train[self.node_test].sum() == 0
+        '''
         for v in range(self.adj_train.shape[0]):
             i_s = self.adj_train.indptr[v]
             i_e = self.adj_train.indptr[v + 1]
@@ -210,6 +211,7 @@ class Minibatch:
                 self.norm_loss_train[v] / self.norm_aggr_train[i_s: i_e], 0, 1e4)
             val[np.isnan(val)] = 0.1
             self.norm_aggr_train[i_s: i_e] = val
+        '''
         self.norm_loss_train[np.where(self.norm_loss_train == 0)[0]] = 0.1
         self.norm_loss_train[self.node_val] = 0
         self.norm_loss_train[self.node_test] = 0
@@ -225,15 +227,20 @@ class Minibatch:
         Perform graph sampling in parallel. A wrapper function for graph_samplers.py
         """
         t0 = time.time()
-        _indptr, _indices, _data, _v, _edge_index = self.graph_sampler.par_sample(
-            phase)
         if self.method_sample == "vanilla_node_python":
+            (_indptr, _indices, _data, _v, _edge_index), curr_graph = self.graph_sampler.par_sample(
+                phase)
+            self.curr_graph = curr_graph
             _data[0] = _data[0].astype('float32')
             _edge_index[0] = _edge_index[0].astype('int32')
+        else:
+            _indptr, _indices, _data, _v, _edge_index = self.graph_sampler.par_sample(
+                phase)
 
         t1 = time.time()
         print('sampling 200 subgraphs:   time = {:.3f} sec'.format(
             t1 - t0), end="\r")
+
         self.subgraphs_remaining_indptr.extend(_indptr)
         self.subgraphs_remaining_indices.extend(_indices)
         self.subgraphs_remaining_data.extend(_data)
@@ -276,10 +283,12 @@ class Minibatch:
                 shape=(self.size_subgraph, self.size_subgraph,
                        )
             )
+            #print(adj)
+            #input()
             adj_edge_index = self.subgraphs_remaining_edge_index.pop()
-            #print("{} nodes, {} edges, {} degree".format(self.node_subgraph.size,adj.size,adj.size/self.node_subgraph.size))
-            norm_aggr(adj.data, adj_edge_index, self.norm_aggr_train,
-                      num_proc=args_global.num_cpu_core)
+            # print("{} nodes, {} edges, {} degree".format(self.node_subgraph.size,adj.size,adj.size/self.node_subgraph.size))
+            # norm_aggr(adj.data, adj_edge_index, self.norm_aggr_train,
+            #          num_proc=args_global.num_cpu_core)
             # adj.data[:] = self.norm_aggr_train[adj_edge_index][:]      # this line is interchangable with the above line
             adj = adj_norm(adj, deg=self.deg_train[self.node_subgraph])
             adj = _coo_scipy2torch(adj.tocoo())
