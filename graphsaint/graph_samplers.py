@@ -64,6 +64,16 @@ class GraphSampler:
     def par_sample(self, stage, **kwargs):
         return self.cy_sampler.par_sample()
 
+    def add_edges(self, node_ids):
+        N = 500
+        added = 0
+        while added < N:
+            start_node = np.random.choice(node_ids)
+            end_node = np.random.choice(node_ids)
+            if start_node != end_node and not self.curr_adj_train[start_node, end_node]:
+                self.curr_adj_train[start_node, end_node] = 1
+                added += 1
+
     def _helper_extract_subgraph(self, node_ids):
         """
         ONLY used for serial Python sampler (NOT for the parallel cython sampler).
@@ -92,9 +102,13 @@ class GraphSampler:
         indices = []
         subg_edge_index = []
         subg_nodes = node_ids
+        # max_size = self.adj_train.shape[0]*(self.adj_train.shape[0] - 1) / 2
+        self.curr_adj_train = self.adj_train.copy().tolil()
+        self.add_edges(node_ids)
+        self.curr_adj_train = self.curr_adj_train.tocsr()
         for nid in node_ids:
-            idx_s, idx_e = self.adj_train.indptr[nid], self.adj_train.indptr[nid + 1]
-            neighs = self.adj_train.indices[idx_s: idx_e]
+            idx_s, idx_e = self.curr_adj_train.indptr[nid], self.curr_adj_train.indptr[nid + 1]
+            neighs = self.curr_adj_train.indices[idx_s: idx_e]
             for i_n, n in enumerate(neighs):
                 if n in orig2subg:
                     indices.append(orig2subg[n])
@@ -104,6 +118,11 @@ class GraphSampler:
         indices = np.array(indices)
         subg_edge_index = np.array(subg_edge_index)
         data = np.ones(indices.size)
+        curr_size = len(data)
+        # print(max_size)
+        # print(curr_size)
+        # print(curr_size / max_size)
+        # input()
         assert indptr[-1] == indices.size == subg_edge_index.size
         return indptr, indices, data, subg_nodes, subg_edge_index
 
@@ -346,14 +365,13 @@ class NodeSamplingVanillaPython(GraphSampler):
         super().__init__(adj_train, node_train, size_subgraph, {})
 
     def par_sample(self, stage, **kwargs):
-        #print(self.p_dist)
-        #print(sum(self.p_dist))
-        node_ids = np.random.choice(self.node_train, self.size_subgraph, p = self.p_dist)
+        node_ids = np.random.choice(
+            self.node_train, self.size_subgraph, p=self.p_dist)
         ret = self._helper_extract_subgraph(node_ids)
         ret = list(ret)
         for i in range(len(ret)):
             ret[i] = [ret[i]]
-        return ret
+        return ret, self.curr_adj_train
 
     def preproc(self, **kwargs):
         """
@@ -368,13 +386,12 @@ class NodeSamplingVanillaPython(GraphSampler):
             ],
             dtype=np.int64,
         )
-        print(_p_dist)
-        self.p_dist = _p_dist**2 / np.sum(_p_dist ** 2)
-    
-    '''    self.p_dist = _p_dist.cumsum()
+        self.p_dist = _p_dist / np.sum(_p_dist)
+        '''
+        self.p_dist = _p_dist.cumsum()
         if self.p_dist[-1] > 2**31 - 1:
             print('warning: total deg exceeds 2**31')
             self.p_dist = self.p_dist.astype(np.float64)
             self.p_dist /= self.p_dist[-1] / (2**31 - 1)
         self.p_dist = self.p_dist.astype(np.int32)
-    '''
+        '''
