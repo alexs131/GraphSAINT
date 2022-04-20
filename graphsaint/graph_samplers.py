@@ -56,6 +56,8 @@ class GraphSampler:
         self.size_subgraph = size_subgraph
         self.name_sampler = 'None'
         self.node_subgraph = None
+        if 'feats' in args_preproc:
+            self.feat_full = args_preproc['feats']
         self.preproc(**args_preproc)
 
     def preproc(self, **kwargs):
@@ -361,8 +363,9 @@ class NodeSamplingVanillaPython(GraphSampler):
     node-induced subgraph.
     """
 
-    def __init__(self, adj_train, node_train, size_subgraph):
-        super().__init__(adj_train, node_train, size_subgraph, {})
+    def __init__(self, adj_train, node_train, size_subgraph, feat_full):
+        super().__init__(adj_train, node_train,
+                         size_subgraph, {'feats': feat_full})
 
     def par_sample(self, stage, **kwargs):
         node_ids = np.random.choice(

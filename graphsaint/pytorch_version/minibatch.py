@@ -28,7 +28,7 @@ class Minibatch:
     calling the proper graph sampler and estimating normalization coefficients.
     """
 
-    def __init__(self, adj_full_norm, adj_train, role, train_params, cpu_eval=False):
+    def __init__(self, adj_full_norm, adj_train, feat_full, role, train_params, cpu_eval=False):
         """
         Inputs:
             adj_full_norm       scipy CSR, adj matrix for the full graph (row-normalized)
@@ -57,6 +57,7 @@ class Minibatch:
 
         self.adj_full_norm = _coo_scipy2torch(adj_full_norm.tocoo())
         self.adj_train = adj_train
+        self.feat_full = feat_full
         # -----------------------
         # sanity check (optional)
         # -----------------------
@@ -172,6 +173,7 @@ class Minibatch:
                 self.adj_train,
                 self.node_train,
                 self.size_subg_budget,
+                self.feat_full
             )
         else:
             raise NotImplementedError
