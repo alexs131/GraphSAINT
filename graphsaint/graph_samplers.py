@@ -346,7 +346,9 @@ class NodeSamplingVanillaPython(GraphSampler):
         super().__init__(adj_train, node_train, size_subgraph, {})
 
     def par_sample(self, stage, **kwargs):
-        node_ids = np.random.choice(self.node_train, self.size_subgraph)
+        #print(self.p_dist)
+        #print(sum(self.p_dist))
+        node_ids = np.random.choice(self.node_train, self.size_subgraph, p = self.p_dist)
         ret = self._helper_extract_subgraph(node_ids)
         ret = list(ret)
         for i in range(len(ret)):
@@ -366,9 +368,13 @@ class NodeSamplingVanillaPython(GraphSampler):
             ],
             dtype=np.int64,
         )
-        self.p_dist = _p_dist.cumsum()
+        print(_p_dist)
+        self.p_dist = _p_dist**2 / np.sum(_p_dist ** 2)
+    
+    '''    self.p_dist = _p_dist.cumsum()
         if self.p_dist[-1] > 2**31 - 1:
             print('warning: total deg exceeds 2**31')
             self.p_dist = self.p_dist.astype(np.float64)
             self.p_dist /= self.p_dist[-1] / (2**31 - 1)
         self.p_dist = self.p_dist.astype(np.int32)
+    '''
