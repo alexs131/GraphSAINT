@@ -5,6 +5,7 @@ import time
 import math
 import pdb
 from math import ceil
+import matplotlib.pyplot as plt
 import graphsaint.cython_sampler as cy
 
 
@@ -66,6 +67,37 @@ class GraphSampler:
     def par_sample(self, stage, **kwargs):
         return self.cy_sampler.par_sample()
 
+    def cos_sim(self, feat1, feat2):
+        return np.dot(feat1, feat2) / \
+            (np.linalg.norm(feat1)*np.linalg.norm(feat2))
+
+    def add_edges_common(self, node_ids):
+        N = 100
+        added = 0
+        thresh = 1
+        common_neighbors = self.adj_train @ self.adj_train.T
+        while added < N:
+            start_node = np.random.choice(node_ids)
+            end_node = np.random.choice(node_ids)
+            common = common_neighbors[start_node, end_node]
+            if start_node != end_node and common >= thresh and not self.curr_adj_train[start_node, end_node]:
+                self.curr_adj_train[start_node, end_node] = 1
+                added += 1
+
+    def add_edges_cosine(self, node_ids):
+        N = 300
+        thresh = 0.25
+        added = 0
+        while added < N:
+            start_node = np.random.choice(node_ids)
+            end_node = np.random.choice(node_ids)
+            feature_start = self.feat_full[start_node]
+            feature_end = self.feat_full[end_node]
+            cos_sim = self.cos_sim(feature_start, feature_end)
+            if start_node != end_node and cos_sim >= thresh and not self.curr_adj_train[start_node, end_node]:
+                self.curr_adj_train[start_node, end_node] = 1
+                added += 1
+
     def add_edges(self, node_ids):
         N = 500
         added = 0
@@ -106,7 +138,7 @@ class GraphSampler:
         subg_nodes = node_ids
         # max_size = self.adj_train.shape[0]*(self.adj_train.shape[0] - 1) / 2
         self.curr_adj_train = self.adj_train.copy().tolil()
-        self.add_edges(node_ids)
+        self.add_edges_common(node_ids)
         self.curr_adj_train = self.curr_adj_train.tocsr()
         for nid in node_ids:
             idx_s, idx_e = self.curr_adj_train.indptr[nid], self.curr_adj_train.indptr[nid + 1]
@@ -364,6 +396,7 @@ class NodeSamplingVanillaPython(GraphSampler):
     """
 
     def __init__(self, adj_train, node_train, size_subgraph, feat_full):
+        self.N = 10000
         super().__init__(adj_train, node_train,
                          size_subgraph, {'feats': feat_full})
 
@@ -380,6 +413,18 @@ class NodeSamplingVanillaPython(GraphSampler):
         """
         Node probability distribution is derived in https://arxiv.org/abs/1801.10247
         """
+        cos_sims = []
+        for i in range(self.N):
+            start_node = np.random.choice(self.node_train)
+            end_node = np.random.choice(self.node_train)
+            cos_sims.append(self.cos_sim(
+                self.feat_full[start_node], self.feat_full[end_node]))
+        plt.hist(cos_sims, bins='auto')
+        plt.xlabel("Cosine Similarity")
+        plt.ylabel("Counts")
+        plt.title("Cosine Similarity in Flickr Dataset")
+        plt.show()
+
         _p_dist = np.array(
             [
                 self.adj_train.data[
