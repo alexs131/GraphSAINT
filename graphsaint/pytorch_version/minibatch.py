@@ -192,13 +192,15 @@ class Minibatch:
         #   2. update the counter for each node / edge in the training graph
         #   3. estimate norm factor alpha and lambda
         tot_sampled_nodes = 0
+        print(self.node_train.size)
+        print(self.sample_coverage * self.node_train.size)
         while True:
             self.par_graph_sample('train')
             tot_sampled_nodes = sum([len(n)
                                     for n in self.subgraphs_remaining_nodes])
             if tot_sampled_nodes > self.sample_coverage * self.node_train.size:
                 break
-        print()
+        print("Finished setup sampling")
         num_subg = len(self.subgraphs_remaining_nodes)
         for i in range(num_subg):
             # self.norm_aggr_train[self.subgraphs_remaining_edge_index[i]] += 1
@@ -213,10 +215,22 @@ class Minibatch:
                 self.norm_loss_train[v] / self.norm_aggr_train[i_s: i_e], 0, 1e4)
             val[np.isnan(val)] = 0.1
             self.norm_aggr_train[i_s: i_e] = val
+        _p_dist = np.array(
+            [
+                self.adj_train.data[
+                    self.adj_train.indptr[v]: self.adj_train.indptr[v + 1]
+                ].sum()
+                for v in self.node_train
+            ],
+            dtype=np.int64,
+        )
         '''
+        # self.p_dist = _p_dist / np.sum(_p_dist)
         self.norm_loss_train[np.where(self.norm_loss_train == 0)[0]] = 0.1
         self.norm_loss_train[self.node_val] = 0
         self.norm_loss_train[self.node_test] = 0
+        # self.norm_loss_train[self.node_train] = _p_dist
+        # self.norm_loss_train[np.where(self.norm_loss_train == 0)[0]] = 0.1
         self.norm_loss_train[self.node_train] = num_subg / \
             self.norm_loss_train[self.node_train] / self.node_train.size
         self.norm_loss_train = torch.from_numpy(

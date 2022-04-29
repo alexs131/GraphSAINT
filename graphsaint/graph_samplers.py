@@ -85,8 +85,8 @@ class GraphSampler:
                 added += 1
 
     def add_edges_cosine(self, node_ids):
-        N = 300
-        thresh = 0.25
+        N = 800
+        thresh = 0.2
         added = 0
         while added < N:
             start_node = np.random.choice(node_ids)
@@ -137,9 +137,9 @@ class GraphSampler:
         subg_edge_index = []
         subg_nodes = node_ids
         # max_size = self.adj_train.shape[0]*(self.adj_train.shape[0] - 1) / 2
-        self.curr_adj_train = self.adj_train.copy().tolil()
-        self.add_edges_common(node_ids)
-        self.curr_adj_train = self.curr_adj_train.tocsr()
+        # self.curr_adj_train = self.adj_train.copy().tolil()
+        # self.add_edges_cosine(node_ids)
+        # self.curr_adj_train = self.curr_adj_train.tocsr()
         for nid in node_ids:
             idx_s, idx_e = self.curr_adj_train.indptr[nid], self.curr_adj_train.indptr[nid + 1]
             neighs = self.curr_adj_train.indices[idx_s: idx_e]
@@ -435,6 +435,7 @@ class NodeSamplingVanillaPython(GraphSampler):
             dtype=np.int64,
         )
         self.p_dist = _p_dist / np.sum(_p_dist)
+
         '''
         self.p_dist = _p_dist.cumsum()
         if self.p_dist[-1] > 2**31 - 1:
